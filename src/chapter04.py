@@ -2,6 +2,8 @@ from pathlib import Path
 import os
 import MeCab
 import re
+import collections
+import matplotlib.pyplot as plt
 
 DATA_DIR = Path(__file__).resolve().parents[1] / 'data'
 
@@ -122,5 +124,65 @@ def task35():
     print(dst)
 
 
+def task36():
+    """36. 単語の出現頻度
+    """
+    src = load_map()
+    nouns = []
+    for sentence in src:
+        [nouns.append(word['base']) for word in sentence if word['pos'] == '名詞']
+    c = collections.Counter(nouns)
+    print(c.most_common())
+
+
+def task37():
+    """37. 頻度上位10語
+    """
+    src = load_map()
+    words = []
+    [[words.append(word['base']) for word in sentence] for sentence in src]
+    c = collections.Counter(words)
+    commons = c.most_common(10)
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    ax.bar([c[0] for c in commons], [c[1] for c in commons])
+    plt.show()
+
+
+def task38():
+    """38. ヒストグラム
+    """
+    src = load_map()
+    words = []
+    [[words.append(word['surface']) for word in sentence] for sentence in src]
+    counts = collections.Counter(words)
+    cmax = counts.most_common(1)[0][1]
+    hist = collections.OrderedDict()
+    cmax = 50
+    for i in range(1, cmax + 1):
+        hist[i] = len(set([key for key, val in counts.items() if val == i]))
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    ax.bar(hist.keys(), hist.values())
+    plt.show()
+
+
+def task39():
+    """39. Zipfの法則
+    """
+    src = load_map()
+    words = []
+    [[words.append(word['base']) for word in sentence] for sentence in src]
+    c = collections.Counter(words)
+    commons = c.most_common()
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    x = range(0, len(commons))
+    ax.plot(x, [c[1] for c in commons])
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    plt.show()
+
+
 if __name__ == '__main__':
-    task35()
+    task39()
