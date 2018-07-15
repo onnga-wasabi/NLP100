@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 import pydot
+import numpy as np
 
 DATA_DIR = Path(__file__).resolve().parents[1] / 'data'
 
@@ -57,8 +58,8 @@ class Chunk(object):
         return '{}:{} srcs:{} dst:{}'.format(self.idx, ''.join([m.surface for m in self.morphs]), self.srcs, self.dst)
 
     def parse(self):
-        self.idx = self.phrase[0].split(' ')[0]
-        self.dst = self.phrase[0].split(' ')[1][:-1]
+        self.idx = int(self.phrase[0].split(' ')[0])
+        self.dst = int(self.phrase[0].split(' ')[1][:-1])
         self.morphs = [Morph(p) for p in self.phrase[1:]]
 
     def set_src(self, srcs):
@@ -192,15 +193,179 @@ def task45():
     lines = []
     for chunks in document:
         for chunk in chunks:
-            if chunk.morphs[0].pos == '動詞':
-                dst = chunk.morphs[0].base
+            verbs = [m for m in chunk.morphs if m.pos == '動詞']
+            if verbs:
+                dst = verbs[0].base
+                srcs = []
                 for c in [c for c in chunks if int(c.idx) in chunk.srcs]:
-                    cases = [m.base for m in c.morphs if m.pos == '助詞']
-                if cases:
-                    lines.append('\t'.join([dst, ' '.join(cases)]))
+                    src = [m.base for m in c.morphs if m.pos == '助詞']
+                    if src:
+                        srcs.append(src[-1])
+                if srcs:
+                    lines.append('\t'.join([dst, ' '.join(sorted(srcs))]))
     with open('output/case_pattern.txt', 'w') as wf:
         wf.write('\n'.join(lines))
 
 
+def task46():
+    """46. 動詞の格フレーム情報の抽出
+    """
+    src = load_neko()
+    document = []
+    for s in src.split('EOS'):
+        if s is not '\n':
+            chunks = [Chunk(phrase) for phrase in s.split('* ')[1:]]
+            for phrase in chunks:
+                phrase.set_src([int(c.idx) for c in chunks if phrase.idx == c.dst])
+            document.append(chunks)
+    lines = []
+    for chunks in document:
+        for chunk in chunks:
+            verbs = [m for m in chunk.morphs if m.pos == '動詞']
+            if verbs:
+                dst = verbs[0].base
+                srcs = []
+                c_srcs = []
+                for c in [c for c in chunks if int(c.idx) in chunk.srcs]:
+                    src = [m.base for m in c.morphs if m.pos == '助詞']
+                    if src:
+                        srcs.append(src[-1])
+                        c_srcs.append(''.join([m.base for m in c.morphs]))
+                if srcs and c_srcs:
+                    lines.append('\t'.join([dst, ' '.join(sorted(srcs)), ' '.join(sorted(c_srcs))]))
+    with open('output/case_frame.txt', 'w') as wf:
+        wf.write('\n'.join(lines))
+
+
+def task47():
+    """47. 機能動詞構文のマイニング
+    """
+    src = load_neko()
+    document = []
+    for s in src.split('EOS'):
+        if s is not '\n':
+            chunks = [Chunk(phrase) for phrase in s.split('* ')[1:]]
+            for phrase in chunks:
+                phrase.set_src([int(c.idx) for c in chunks if phrase.idx == c.dst])
+            document.append(chunks)
+    lines = []
+    for chunks in document:
+        for chunk in chunks:
+            verbs = [m for m in chunk.morphs if m.pos == '動詞']
+            if verbs:
+                for c in [c for c in chunks if int(c.idx) in chunk.srcs]:
+                    morphs = c.morphs
+                    sahen = [''.join([m.surface, morphs[i + 1].surface])
+                             for i, m in enumerate(morphs[:-1])
+                             if m.pos == '名詞' and m.pos1 == 'サ変接続' and
+                             morphs[i + 1].surface == 'を' and morphs[i + 1].pos == '助詞']
+                if sahen:
+                    dst = sahen[0] + verbs[0].base
+                    srcs = []
+                    c_srcs = []
+                    for c in [c for c in chunks if int(c.idx) in chunk.srcs]:
+                        if not sahen[0] in ''.join([m.surface for m in c.morphs]):
+                            src = [m.base for m in c.morphs if m.pos == '助詞']
+                            if src:
+                                srcs.append(src[-1])
+                                c_srcs.append(''.join([m.surface for m in c.morphs]))
+                    if srcs and c_srcs:
+                        idx = np.argsort(srcs)
+                        srcs = np.array(srcs)
+                        c_srcs = np.array(c_srcs)
+                        lines.append('\t'.join([dst, ' '.join(srcs[idx]), ' '.join(c_srcs[idx])]))
+    with open('output/mining.txt', 'w') as wf:
+        wf.write('\n'.join(lines))
+
+
+def get_path_to_root(chunk, chunks, path=''):
+    surface = ''.join([m.surface for m in chunk.morphs if m.pos != '記号'])
+    if int(chunk.dst) == -1:
+        return path + surface
+    else:
+        dst = [c for c in chunks if c.idx == chunk.dst]
+        path = path + surface + ' -> '
+        return get_path_to_root(dst[0], chunks, path=path)
+
+
+def task48():
+    """48. 名詞から根へのパスの抽出
+    """
+    src = load_neko()
+    document = []
+    for s in src.split('EOS'):
+        if s is not '\n':
+            chunks = [Chunk(phrase) for phrase in s.split('* ')[1:]]
+            for phrase in chunks:
+                phrase.set_src([int(c.idx) for c in chunks if phrase.idx == c.dst])
+            document.append(chunks)
+    paths_to_root = []
+    for chunks in document:
+        for chunk in [c for c in chunks if '名詞' in [m.pos for m in c.morphs]]:
+            paths_to_root.append(get_path_to_root(chunk, chunks))
+
+    for ptr in paths_to_root[:30]:
+        print(ptr)
+
+
+def get_path_before_root(chunk, chunks, val, path=''):
+    if path == '':
+        surface = [m.surface for m in chunk.morphs if m.pos != '記号']
+        surface[0] = val
+        surface = ''.join(surface)
+    else:
+        surface = ''.join([m.surface for m in chunk.morphs if m.pos != '記号'])
+    if chunk.dst == -1:
+        return path
+    else:
+        if chunks[chunk.dst].dst == -1:
+            return path + surface + ' | '
+        path = path + surface + ' -> '
+        return get_path_before_root(chunks[chunk.dst], chunks, val, path=path)
+
+
+def get_path_A_to_B(chunk, chunks, idx, path=''):
+    if path == '':
+        surface = [m.surface for m in chunk.morphs if m.pos != '記号']
+        surface[0] = 'X'
+        surface = ''.join(surface)
+    else:
+        surface = ''.join([m.surface for m in chunk.morphs if m.pos != '記号'])
+    if chunk.idx == idx:
+        return path + 'Y'
+    else:
+        path = path + surface + ' -> '
+        return get_path_A_to_B(chunks[chunk.idx + 1], chunks, idx, path=path)
+
+
+def task49():
+    """49. 名詞間の係り受けパスの抽出
+    """
+    src = load_neko()
+    document = []
+    for s in src.split('EOS'):
+        if s is not '\n':
+            chunks = [Chunk(phrase) for phrase in s.split('* ')[1:]]
+            for phrase in chunks:
+                phrase.set_src([int(c.idx) for c in chunks if phrase.idx == c.dst])
+            document.append(chunks)
+    lines = []
+    append = lines.append
+    for chunks in document[:8]:
+        noun_chunks = [c for c in chunks if '名詞' in [m.pos for m in c.morphs]]
+        for i, nc1 in enumerate(noun_chunks):
+            for nc2 in noun_chunks[i + 1:]:
+                # print(nc1.chunk, chunks[nc1.dst].chunk)
+                if nc1.dst > nc2.idx:
+                    append(get_path_before_root(nc1, chunks, 'X') +
+                           get_path_before_root(nc2, chunks, 'Y') +
+                           chunks[nc1.dst].chunk)
+                else:
+                    append(get_path_A_to_B(nc1, chunks, nc2.idx))
+
+    for line in lines[: 30]:
+        print(line)
+
+
 if __name__ == '__main__':
-    task45()
+    task49()
