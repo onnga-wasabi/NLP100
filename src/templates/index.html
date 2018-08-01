@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<title>けんさくぅ！！</title>
+</head>
+<body>
+	{% if content %}
+	<p>{{ content.msg }}</p>
+	{% else%}
+		<p>アーティスト検索してねー</p>
+	{% endif %}
+	<form action="/" method="post">
+		<table border="0">
+			<tr>
+				<td align="right"><b> アーティスト名：</b></td>
+				<td><input type="text" name="name"></td>
+			</tr>
+			<tr>
+				<td align="right"><b> 別名：</b></td>
+				<td><input type="text" name="alias"></td>
+			</tr>
+			<tr>
+				<td align="right"><b> タグ：</b></td>
+				<td><input type="text" name="tag"></td>
+			</tr>
+		</table>
+		<input type="submit" value="検索">
+	</form>
+	{% if content %}
+		{% for artist in content.artists %}
+		<h4>{{ loop.index0 + 1  }}件目のアーティスト</h4>
+		<ul>
+			<li>アーティスト名: {{ artist.name }}</li>
+			<li>活動場所: {{ artist.area }}</li>
+			{% if artist.tags %}
+			<li>関連タグ:
+				<ul>
+					{% for tag in artist.tags %}
+					<li>{{ tag.value }}</li>
+					{% endfor %}
+				</ul>
+			</li>
+			{% endif %}
+		</ul>
+		{% endfor %}
+	{% endif %}
+</body>
+</html>
