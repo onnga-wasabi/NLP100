@@ -86,6 +86,7 @@ def task63(init=False):
 
 def task64(init=False):
     """64. MongoDBの構築
+    server 起動しておいてね
     """
     client = MongoClient()
     db = client.nlp
